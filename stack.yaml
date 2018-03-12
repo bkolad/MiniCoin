@@ -1,0 +1,12 @@
+flags: {}
+packages:
+- .
+extra-deps:
+- containers-0.5.11.0
+- cryptonite-0.24
+- optparse-applicative-0.14.1.0
+- stm-2.4.5.0
+- log-warper-1.8.3
+- servant-0.12.1
+- logging-3.0.5
+resolver: nightly-2018-03-07

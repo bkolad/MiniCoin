@@ -1,0 +1,62 @@
+name:                BlockChain
+version:             0.1.0.0
+-- synopsis:
+-- description:
+homepage:            https://github.com/githubuser/BlockChain#readme
+license:             MIT
+license-file:        LICENSE
+author:              blazejk
+maintainer:          example@example.com
+copyright:           2018 blazejk
+category:            BlockChain
+build-type:          Simple
+extra-source-files:  README.md
+cabal-version:       >=1.10
+
+library
+  hs-source-dirs:      src
+  exposed-modules:     Server, Transaction, Types, BlockChain, Logger
+  build-depends:       base >= 4.7 && < 5
+                     , aeson
+                     , servant-server
+                     , stm
+                     , wai
+                     , warp
+                     , containers
+                     , cryptonite
+                     , binary
+                     , bytestring
+                     , memory
+                     , text
+                     , log-warper
+                     , logging
+                     , transformers
+  default-language:    Haskell2010
+
+executable BlockChain-exe
+  hs-source-dirs:      app
+  main-is:             Main.hs
+  ghc-options:         -threaded -rtsopts -with-rtsopts=-N
+  build-depends:       base
+                     , BlockChain
+                     , text
+                     , stm
+                     , optparse-applicative
+  default-language:    Haskell2010
+
+test-suite BlockChain-test
+  type:                exitcode-stdio-1.0
+  hs-source-dirs:      test
+  main-is:             Spec.hs
+  build-depends:       base
+                     , BlockChain
+                     , hspec
+                     , hspec-wai
+                     , hspec-wai-json
+                     , aeson
+  ghc-options:         -threaded -rtsopts -with-rtsopts=-N
+  default-language:    Haskell2010
+
+source-repository head
+  type:     git
+  location: https://github.com/githubuser/BlockChain
