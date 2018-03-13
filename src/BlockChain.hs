@@ -9,7 +9,7 @@ module BlockChain
     , initBlockChain
     ) where
 
-import           Control.Concurrent.STM
+import           Control.Concurrent.Extended 
 import qualified Crypto.Hash             as H
 import qualified Data.Binary             as B
 import qualified Data.ByteArray.Encoding as E
@@ -40,9 +40,7 @@ mineBlock minerAcc blockChain transactions nonce =
               , _transactions = minerReward minerAcc : (validTransactions blockChain transactions)
               , _nonce = nonce
               }
-
         in BlockData block (hash256BC blockChain)
-
 
 validTransactions :: BlockChain -> [Transaction] -> [Transaction]
 validTransactions blockChain ts =
@@ -68,7 +66,6 @@ validateChain :: BlockChain -> Bool
 validateChain (_, []) = True
 validateChain (g, x:xs) =
      (_parentHash x == hashOfTheTail) && (validateChain blockChainTail)
-
     where
         blockChainTail = (g, xs)
         hashOfTheTail = hash256BC blockChainTail
@@ -107,7 +104,6 @@ hash256 b  =
 
 append :: BlockChain -> BlockData -> BlockChain
 append (g, xs) !x = (g, x:xs)
-
 
 
 registerNode = undefined

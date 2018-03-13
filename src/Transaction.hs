@@ -5,7 +5,7 @@ module Transaction
     , getTransactions
     ) where
 
-import           Control.Concurrent.STM
+import           Control.Concurrent.Extended
 import           Types
 
 
