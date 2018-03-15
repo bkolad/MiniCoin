@@ -9,7 +9,7 @@ module BlockChain
     , initBlockChain
     ) where
 
-import           Control.Concurrent.Extended 
+import           Control.Concurrent.Extended
 import qualified Crypto.Hash             as H
 import qualified Data.Binary             as B
 import qualified Data.ByteArray.Encoding as E
@@ -80,7 +80,7 @@ verifyProofOfWork bd = B.isPrefixOf difficulty hash
 
 mine :: Account -> BlockChain -> [Transaction] -> BlockChain
 mine miner blockChain tcns =
-       let blockData = head
+       let blockData = head -- it safe here, we are filtering stream
                 $ filter verifyProofOfWork
                 $ (\nonce -> mineBlock miner blockChain tcns nonce) <$> [1 ..]
        in append blockChain blockData

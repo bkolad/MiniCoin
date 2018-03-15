@@ -64,15 +64,14 @@ server = newTransaction
 
 mineBlock :: ReaderT Env Handler NoContent
 mineBlock = do
-    tid <-liftIO myThreadId
-    State bc pending <- askForSate
+    State bc pending <- askForState
     Log.logM  "start mining "
     (x,y) <-liftIO $ readState bc pending
     let !newBCN =  BCN.mine (Account "M1") x y
     Log.logM  "block mined "
     _ <-liftIO $ atomically $ do
         writeTVar bc newBCN
-        writeTVar pending [] --}
+        writeTVar pending []
     return NoContent
         where
             readState bc pending =
@@ -85,7 +84,7 @@ mineBlock = do
 --http://localhost:8080/blockchain
 chain :: ReaderT Env Handler BlockChain
 chain = do
-        blockchain <- _blockChain <$> askForSate
+        blockchain <- _blockChain <$> askForState
         liftIO $ BCN.getBlockChain blockchain
 
 
@@ -95,18 +94,18 @@ resolve = undefined
 --curl -X POST -d '{"from":{"tag":"Account","contents":"John"},"to":{"tag":"Account","contents":"Me"},"amount":99}' -H 'Accept: application/json' -H 'Content-type: application/json' http://localhost:8080/transactions/new/
 newTransaction :: Transaction -> ReaderT Env Handler NoContent
 newTransaction transaction = do
-      pendTransactions <- _pendingTransactions <$> askForSate
+      pendTransactions <- _pendingTransactions <$> askForState
       liftIO $ TCN.addTransaction pendTransactions transaction
       return NoContent
 
 --http://localhost:8080/transactions/pending
 pendingTransactions :: ReaderT Env Handler [Transaction]
 pendingTransactions = do
-    State _ pendTransactions <- askForSate
+    State _ pendTransactions <- askForState
     liftIO $ TCN.getTransactions pendTransactions
 
 
-askForSate :: ReaderT Env Handler State
-askForSate = do
+askForState :: ReaderT Env Handler State
+askForState = do
     env <- ask :: ReaderT Env Handler Env
     return $ _state env
