@@ -9,4 +9,5 @@ extra-deps:
 - log-warper-1.8.3
 - servant-0.12.1
 - logging-3.0.5
+- attoparsec-0.13.2.2
 resolver: nightly-2018-03-07

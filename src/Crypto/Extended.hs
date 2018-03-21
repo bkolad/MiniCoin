@@ -1,26 +1,32 @@
-{-# LANGUAGE DeriveGeneric     #-}
-{-# LANGUAGE OverloadedStrings #-}
 
 module Crypto.Extended
-    (
+    ( generateKeys
+    , showPrivateKey
+    , showPublicKey
+    , mkPublicKey
+    , mkPrivateKey
+    , validateKeys
     ) where
 
 
-import qualified Crypto.PubKey.ECC.ECDSA    as ECC
-import qualified Crypto.PubKey.ECC.Generate as ECC
-import qualified Crypto.PubKey.ECC.Types    as ECC
-import qualified Data.Binary                as B
-import qualified Data.ByteString            as B
-import qualified Data.ByteString.Base16     as Base16
-import qualified Data.ByteString.Lazy       as BL
-import qualified Data.Text                  as T
+import qualified Crypto.PubKey.ECC.ECDSA          as ECC
+import qualified Crypto.PubKey.ECC.Generate       as ECC
+import qualified Crypto.PubKey.ECC.Types          as ECC
+import qualified Data.Attoparsec.ByteString.Char8 as B8
+import qualified Data.Binary                      as B
+import qualified Data.ByteString                  as B
+import qualified Data.ByteString.Base16           as Base16
+import qualified Data.ByteString.Lazy             as BL
+import qualified Data.Text                        as T
+import qualified Data.Text.Encoding               as T
+import qualified Data.Text.IO                     as T
 import           Data.Word8
-import           GHC.Generics               (Generic)
+import           GHC.Generics                     (Generic)
 import           Types
 
 
 
-newtype B16 = B16 B.ByteString
+
 
 instance B.Binary ECC.Point where
     put (ECC.Point x y) = do
@@ -39,7 +45,6 @@ instance B.Binary ECC.Point where
                 return  ECC.PointO
             _ -> error "Serialized data corrupted"
 
-
 instance B.Binary ECC.PublicKey where
     put pKey = B.put $ ECC.public_q pKey
     get = ECC.PublicKey sec_t571r1 <$> B.get
@@ -50,32 +55,50 @@ instance B.Binary ECC.PrivateKey where
     get = ECC.PrivateKey sec_t571r1 <$> B.get
 
 
-generateKeys :: IO (ECC.PublicKey, ECC.PrivateKey)
-generateKeys = ECC.generate sec_t571r1
+validateKeys :: (Key Public, Key Private)
+             -> Either T.Text (Key ValidPublic, Key ValidPrivate)
+validateKeys (pub, priv) = do
+    _  <- b16ToPublicKey pub
+    _  <- b16ToPrivateKey priv
+    return (validate pub , validate priv)
+    where
+        validate (K x) = K x
+
+
+mkPublicKey :: B.ByteString -> Key ValidPublic
+mkPublicKey = K
+
+mkPrivateKey :: B.ByteString -> Key ValidPrivate
+mkPrivateKey = K
+
+generateKeys :: IO (Key ValidPublic, Key ValidPrivate)
+generateKeys = do
+    (pub, priv) <- ECC.generate sec_t571r1
+    return  (K $ publicKeyToB16 pub, K $ privateKeyToB16 priv)
 
 sec_t571r1 = ECC.getCurveByName ECC.SEC_t571r1
 
 
 -------------------------------------------------
-publicKeyToB16 :: ECC.PublicKey -> B16
-publicKeyToB16 pk = B16 $ Base16.encode $ encodeToStrictBS pk
+publicKeyToB16 :: ECC.PublicKey -> B.ByteString
+publicKeyToB16 pk =  Base16.encode $ encodeToStrictBS pk
 
-b16ToPublicKey :: B16 -> Either T.Text ECC.PublicKey
-b16ToPublicKey = b16ToKey
-
--------------------------------------------------
-
-privateKeyToB16 :: ECC.PrivateKey -> B16
-privateKeyToB16 pk = B16 $ Base16.encode $ encodeToStrictBS pk
-
-b16ToPrivateKey :: B16 -> Either T.Text ECC.PrivateKey
-b16ToPrivateKey  = b16ToKey
+b16ToPublicKey :: Key Public -> Either T.Text ECC.PublicKey
+b16ToPublicKey (K bs)= b16ToKey "Public" bs
 
 -------------------------------------------------
 
-verify :: B16 -> ECC.Signature -> B.ByteString -> Bool
+privateKeyToB16 :: ECC.PrivateKey -> B.ByteString
+privateKeyToB16 pk =  Base16.encode $ encodeToStrictBS pk
+
+b16ToPrivateKey ::  Key Private -> Either T.Text ECC.PrivateKey
+b16ToPrivateKey (K bs) = b16ToKey "Private" bs
+
+-------------------------------------------------
+
+verify :: B.ByteString -> ECC.Signature -> B.ByteString -> Bool
 verify pkB16 sig msg=
-    let pub = b16ToPublicKey pkB16
+    let pub = undefined b16ToPublicKey pkB16
     in undefined --ECC.verify SHA256 pub sig msg
 
 sign :: ECC.PrivateKey -> B.ByteString -> IO ECC.Signature
@@ -87,8 +110,8 @@ encodeToStrictBS b = BL.toStrict $ B.encode b
 decodeFromStrictBS :: B.Binary b => B.ByteString -> b
 decodeFromStrictBS bs = B.decode $ BL.fromChunks [bs]
 
-b16ToKey :: B.Binary b => B16 -> Either T.Text b
-b16ToKey (B16 b16) =
+b16ToKey :: B.Binary b => T.Text -> B.ByteString -> Either T.Text b
+b16ToKey errorMSG b16 =
     case Base16.decode b16 of
         (x, "")       -> Right $ decodeFromStrictBS x
-        (_, nonEmpty) -> Left "ERROR: Key is not HEX encoded"
+        (_, nonEmpty) -> Left $ "ERROR:" <> errorMSG <> " Key is not HEX encoded"

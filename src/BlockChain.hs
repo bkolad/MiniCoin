@@ -1,25 +1,24 @@
 {-# LANGUAGE BangPatterns      #-}
 {-# LANGUAGE OverloadedStrings #-}
+--{-# LANGUAGE  RecordWildCards  #-}
 
 module BlockChain
     ( mine
     , getBlockChain
-    , registerNode
-    , resolve
     , initBlockChain
     ) where
 
 import           Control.Concurrent.Extended
-import qualified Crypto.Hash             as H
-import qualified Data.Binary             as B
-import qualified Data.ByteArray.Encoding as E
-import qualified Data.ByteString         as B
-import qualified Data.ByteString.Char8   as C8
-import qualified Data.ByteString.Lazy    as BL
-import qualified Data.List.NonEmpty      as NEL
-import qualified Data.Map.Strict         as M
-import qualified Data.Text               as T
-import qualified Transaction             as TCN
+import qualified Crypto.Hash                 as H
+import qualified Data.Binary                 as B
+import qualified Data.ByteArray.Encoding     as E
+import qualified Data.ByteString             as B
+import qualified Data.ByteString.Char8       as C8
+import qualified Data.ByteString.Lazy        as BL
+import qualified Data.List.NonEmpty          as NEL
+import qualified Data.Map.Strict             as M
+import qualified Data.Text                   as T
+import qualified Transaction                 as TCN
 import           Types
 
 
@@ -31,7 +30,10 @@ initBlockChain =
 
 minerReward miner = Transaction Faucet miner 12
 
-genesis = Genesis $ Transaction Faucet (Account "John") 1000
+genesis = Block { _minerAccount = undefined
+                , _transactions  = []
+                , _nonce        = 99
+                }
 
 mineBlock :: Account -> BlockChain -> [Transaction] -> Int -> BlockData
 mineBlock minerAcc blockChain transactions nonce =
@@ -48,7 +50,7 @@ validTransactions blockChain ts =
      where
         balances = balanceMap $ allTransactions blockChain
         -- order does not matter
-        allTransactions (Genesis t, bc) = t : (_block <$> bc >>= _transactions)
+        allTransactions (Block{}, bc) = _block <$> bc >>= _transactions
         -- this implementation allows double spending
         isTransactionValid (Transaction from _  amount) =
             case M.lookup from balances of
@@ -104,7 +106,3 @@ hash256 b  =
 
 append :: BlockChain -> BlockData -> BlockChain
 append (g, xs) !x = (g, x:xs)
-
-
-registerNode = undefined
-resolve = undefined

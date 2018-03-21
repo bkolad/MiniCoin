@@ -64,21 +64,32 @@ server = newTransaction
 
 mineBlock :: ReaderT Env Handler NoContent
 mineBlock = do
+    isMiner <- _isMiner <$> ask
+    if isMiner then
+        startMining
+    else do
+        Log.logM  "Node is not a miner"
+        return NoContent
+
+
+startMining :: ReaderT Env Handler NoContent
+startMining = do
     State bc pending <- askForState
     Log.logM  "start mining "
-    (x,y) <-liftIO $ readState bc pending
-    let !newBCN =  BCN.mine (Account "M1") x y
+    (bChain, pTrans) <-liftIO $ readState bc pending
+    (pubKey, _)<-_keys <$> ask
+    let !newBCN =  BCN.mine (Account pubKey) bChain pTrans
     Log.logM  "block mined "
     _ <-liftIO $ atomically $ do
         writeTVar bc newBCN
         writeTVar pending []
     return NoContent
-        where
-            readState bc pending =
-                atomically $
-                    do b <- readTVar bc
-                       p <- readTVar pending
-                       return (b, p)
+    where
+        readState bc pending =
+            atomically $
+                do b <- readTVar bc
+                   p <- readTVar pending
+                   return (b, p)
 
 
 --http://localhost:8080/blockchain
@@ -87,9 +98,6 @@ chain = do
         blockchain <- _blockChain <$> askForState
         liftIO $ BCN.getBlockChain blockchain
 
-
-registerNode = undefined
-resolve = undefined
 
 --curl -X POST -d '{"from":{"tag":"Account","contents":"John"},"to":{"tag":"Account","contents":"Me"},"amount":99}' -H 'Accept: application/json' -H 'Content-type: application/json' http://localhost:8080/transactions/new/
 newTransaction :: Transaction -> ReaderT Env Handler NoContent

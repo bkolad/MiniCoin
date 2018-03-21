@@ -16,7 +16,7 @@ cabal-version:       >=1.10
 library
   hs-source-dirs:      src
   exposed-modules:     Server, Transaction, Types, BlockChain
-                     , Control.Logging.Extended
+                     , Control.Logging.Extended, Crypto.KeyParser
                      , Control.Concurrent.Extended
                      , Crypto.Extended
   build-depends:       base >= 4.7 && < 5
@@ -36,7 +36,9 @@ library
                      , transformers
                      , base16-bytestring
                      , word8
+                     , attoparsec
   default-language:    Haskell2010
+  extensions:        OverloadedStrings
 
 executable BlockChain-exe
   hs-source-dirs:      app
@@ -47,7 +49,10 @@ executable BlockChain-exe
                      , text
                      , stm
                      , optparse-applicative
+                     , bytestring
   default-language:    Haskell2010
+  extensions:        OverloadedStrings
+
 
 test-suite BlockChain-test
   type:                exitcode-stdio-1.0

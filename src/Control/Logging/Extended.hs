@@ -8,6 +8,7 @@ module Control.Logging.Extended
     ,newTBQLogger
     ,Logger(..)
     ,mkLogger
+    ,simple
     ) where
 
 import           Control.Concurrent.Extended
@@ -25,10 +26,11 @@ data Logger = Simple
 
 
 mkLogger :: Logger -> T.Text -> IO ()
-mkLogger Simple txt = do
-    tid <- myThreadId
-    Log.log $ T.pack(show tid) <>" "<>txt
+mkLogger Simple txt = Log.log $ txt
 mkLogger (Concurrent tbq) txt = tryWriteTBQueue tbq txt
+
+simple :: Logger
+simple = Simple
 
 
 concurrentLog :: TBQueue T.Text -> T.Text -> IO()
@@ -41,9 +43,9 @@ logM txt = do
     liftIO $ fl txt
 
 
-newTBQLogger :: Int -> IO (Logger)
-newTBQLogger n = do
-    tbq <- newTBQueueIO n
+newTBQLogger :: IO (Logger)
+newTBQLogger = do
+    tbq <- newTBQueueIO 1000
     forkIO $ forever $ do
         txt <- atomically $ readTBQueue tbq
         Log.log $ txt

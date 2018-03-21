@@ -1,6 +1,8 @@
-{-# LANGUAGE DeriveGeneric     #-}
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE TemplateHaskell   #-}
+{-# LANGUAGE DeriveGeneric      #-}
+{-# LANGUAGE FlexibleInstances  #-}
+{-# LANGUAGE OverloadedStrings  #-}
+{-# LANGUAGE StandaloneDeriving #-}
+{-# LANGUAGE TemplateHaskell    #-}
 
 
 module Types
@@ -14,6 +16,13 @@ module Types
     , Genesis(..)
     , Account(..)
     , Env(..)
+    , Key (..)
+    , Public
+    , Private
+    , ValidPublic
+    , ValidPrivate
+    , showPrivateKey
+    , showPublicKey
     , module Data.Semigroup
     ) where
 
@@ -25,13 +34,44 @@ import           Data.Binary
 import qualified Data.ByteString        as B
 import qualified Data.ByteString.Lazy   as BL
 import qualified Data.List.NonEmpty     as NEL
+import           Data.Semigroup         ((<>))
 import qualified Data.Text              as T
 import qualified Data.Text.Encoding     as T
 import           GHC.Generics           (Generic)
-import           Data.Semigroup         ((<>))
 
 
-data Account = Account !T.Text | Faucet
+data Public
+data Private
+data ValidPublic
+data ValidPrivate
+
+newtype Key k = K B.ByteString
+
+deriving instance Show (Key ValidPrivate)
+
+
+deriving instance Eq (Key ValidPublic)
+deriving instance Show (Key ValidPublic)
+deriving instance Ord (Key ValidPublic)
+deriving instance Generic (Key ValidPublic)
+
+instance Binary (Key ValidPublic)
+
+showPublicKey :: Key ValidPublic -> T.Text
+showPublicKey (K pubKey) = T.decodeLatin1 pubKey
+
+showPrivateKey :: Key ValidPrivate -> T.Text
+showPrivateKey (K privKey) = T.decodeLatin1 privKey
+
+instance ToJSON (Key ValidPublic) where
+    toJSON = toJSON . showPublicKey
+
+
+instance FromJSON (Key ValidPublic) where
+    parseJSON = withText "PublicKey" $ pure . K . T.encodeUtf8
+
+
+data Account = Account !(Key ValidPublic) | Faucet
     deriving (Eq, Show, Generic, Ord)
 
 $(deriveJSON defaultOptions ''Account)
@@ -85,11 +125,7 @@ data BlockData = BlockData
 $(deriveJSON defaultOptions ''BlockData)
 instance Binary BlockData
 
-newtype Genesis = Genesis Transaction
-        deriving (Eq, Show, Generic)
-
-$(deriveJSON defaultOptions ''Genesis)
-instance Binary Genesis
+type Genesis = Block
 
 
 type BlockChain = (Genesis, [BlockData])
@@ -102,7 +138,8 @@ data State = State
 
 
 data Env = Env
-         { _state    :: !State
-         , _log      :: !(T.Text -> IO ())
-         , _minerAcc :: !(Maybe Account)
+         { _state   :: !State
+         , _log     :: !(T.Text -> IO ())
+         , _isMiner :: Bool
+         , _keys    :: !(Key ValidPublic, Key ValidPrivate)
          }
