@@ -1,0 +1,7 @@
+ curl -X POST -d '{"to":"00010100000000000000476a4396106866e0f4b2bb1506dc367578a35705ff76f7bcd732b41bd107af441e83481af17a1ab7dc0ebc8545bab9be383785463ced8eb59a1bed8f163b1ec4532e540e355bebff010100000000000000486bd733261a0c6adf2412a68973f259012fb67d90921fe6a1551e57839b4c6b037ee362e2a6340f8b9e54a224ca88c95fe317e949921dcbeeabc42c6f6f0cdbc117a0f7ce3f658302","amount":22}' -H 'Accept: application/json' -H 'Content-type: application/json' http://localhost:8080/transactions/new/
+
+http://localhost:8080/transactions/pending
+
+http://localhost:8080/blockchain
+
+http://localhost:8080/blockchain/mine

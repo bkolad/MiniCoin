@@ -6,6 +6,8 @@ module Crypto.Extended
     , mkPublicKey
     , mkPrivateKey
     , validateKeys
+    , verify
+    , signTransactionHeader
     ) where
 
 
@@ -56,7 +58,7 @@ instance B.Binary ECC.PrivateKey where
 
 
 validateKeys :: (Key Public, Key Private)
-             -> Either T.Text (Key ValidPublic, Key ValidPrivate)
+             -> Either T.Text (Key Public, Key Private)
 validateKeys (pub, priv) = do
     _  <- b16ToPublicKey pub
     _  <- b16ToPrivateKey priv
@@ -65,13 +67,13 @@ validateKeys (pub, priv) = do
         validate (K x) = K x
 
 
-mkPublicKey :: B.ByteString -> Key ValidPublic
+mkPublicKey :: B.ByteString -> Key Public
 mkPublicKey = K
 
-mkPrivateKey :: B.ByteString -> Key ValidPrivate
+mkPrivateKey :: B.ByteString -> Key Private
 mkPrivateKey = K
 
-generateKeys :: IO (Key ValidPublic, Key ValidPrivate)
+generateKeys :: IO (Key Public, Key Private)
 generateKeys = do
     (pub, priv) <- ECC.generate sec_t571r1
     return  (K $ publicKeyToB16 pub, K $ privateKeyToB16 priv)
@@ -96,13 +98,34 @@ b16ToPrivateKey (K bs) = b16ToKey "Private" bs
 
 -------------------------------------------------
 
-verify :: B.ByteString -> ECC.Signature -> B.ByteString -> Bool
-verify pkB16 sig msg=
-    let pub = undefined b16ToPublicKey pkB16
-    in undefined --ECC.verify SHA256 pub sig msg
+verify :: Key Public -> ECC.Signature -> B.ByteString -> Bool
+verify pk sig msg=
+    let k = validKeyToByteString pk
+    in  ECC.verify SHA256 k sig msg
 
-sign :: ECC.PrivateKey -> B.ByteString -> IO ECC.Signature
-sign pk = ECC.sign pk SHA256
+
+sign :: Key Private -> B.ByteString -> IO ECC.Signature
+sign pk =
+    let k = validKeyToByteString pk
+    in ECC.sign k SHA256
+
+
+signTransactionHeader:: Key Private -> TransactionHeader -> IO Sig
+signTransactionHeader pk tr = signatureToSig <$> sign pk encodedTR
+    where encodedTR = BL.toStrict $ B.encode tr
+
+
+signatureToSig ::  ECC.Signature -> Sig
+signatureToSig s = (ECC.sign_r s, ECC.sign_s s)
+
+
+validKeyToByteString :: B.Binary p => Key k -> p
+validKeyToByteString (K pk )=
+    case pub of
+        Right k -> k
+        Left x -> error $ show x
+    where pub =  b16ToKey "Impossible Happend, Validated key not hex encoded:" pk
+
 
 encodeToStrictBS :: B.Binary b => b -> B.ByteString
 encodeToStrictBS b = BL.toStrict $ B.encode b

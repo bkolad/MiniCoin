@@ -26,42 +26,64 @@ initBlockChain :: IO (TVar BlockChain)
 initBlockChain =
     newTVarIO (genesis, [])
 
+hardcodedMinerForGensis = K "00010100000000000000487c1741d7169bd8ac5ca752a28f736b231f901857b56c4d1a38bbf6302a1224a039fb13bc50f9f0b61ac03d825067904d7ffdb0e40f8d4f5bc68df3c64b6a3b4c2407035a53c3cc0601010000000000000048d16539e35721426503171e245cf049390d1c675097340d7ae35431209a32c36b7370a25c5b772947b0232b893302e62ce3d8911add4b0dad283a4478408418ebf231dc7896c4ac06"
 
 
-minerReward miner = Transaction Faucet miner 12
-
-genesis = Block { _minerAccount = undefined
+genesis = Block { _minerAccount = hardcodedMinerForGensis
+                , _minerReward = 50
                 , _transactions  = []
-                , _nonce        = 99
+                , _nonce         = 99
                 }
 
 mineBlock :: Account -> BlockChain -> [Transaction] -> Int -> BlockData
 mineBlock minerAcc blockChain transactions nonce =
     let block = Block
               { _minerAccount = minerAcc
-              , _transactions = minerReward minerAcc : (validTransactions blockChain transactions)
+              , _minerReward = 50
+              , _transactions = validTransactions blockChain transactions
               , _nonce = nonce
               }
         in BlockData block (hash256BC blockChain)
 
-validTransactions :: BlockChain -> [Transaction] -> [Transaction]
-validTransactions blockChain ts =
-    filter isTransactionValid ts
-     where
-        balances = balanceMap $ allTransactions blockChain
-        -- order does not matter
-        allTransactions (Block{}, bc) = _block <$> bc >>= _transactions
-        -- this implementation allows double spending
-        isTransactionValid (Transaction from _  amount) =
-            case M.lookup from balances of
-                 Nothing      -> False
-                 Just balance -> balance >= amount
 
-        balanceMap ts = foldl mkMap M.empty ts
-            where
-                mkMap acc (Transaction from to amount) =
-                    let  m = M.insertWith (+) from (-amount) acc
-                    in M.insertWith (+) to amount m
+
+validTransactions :: BlockChain -> [Transaction] -> [Transaction]
+validTransactions  blockChain ts =
+    filter isValid ts
+     where
+        isValid = isTransactionValid (balanceMap blockChain)
+
+dist :: (a -> b, a -> c) -> a -> (b, c)
+dist (f, g) = \a -> (f a, g a)
+-- this implementation allows double spending
+balanceMap :: BlockChain -> M.Map Account Int
+balanceMap (Block{}, bc) =
+    let allMinerRewards =  dist ( _minerAccount, _minerReward) <$> _block <$> bc
+        allTransactions =  _transactions . _block =<< bc
+        transactionBalanceMap = foldl mkMapT M.empty allTransactions
+
+    in foldl mkMapR transactionBalanceMap allMinerRewards
+        where
+            mkMapT !acc (Transaction tHeader _) =
+                let from    = _from tHeader
+                    to      = _to tHeader
+                    amount  = _amount tHeader
+
+                    m = M.insertWith (+) from (- amount) acc
+                in M.insertWith (+) to amount m
+
+            mkMapR !acc (miner, amount) =
+                  M.insertWith (+) miner amount acc
+
+
+
+isTransactionValid :: M.Map Account Int -> Transaction -> Bool
+isTransactionValid balanceMap (Transaction tHeader sig)  =
+    case M.lookup (_from tHeader) balanceMap of
+         Nothing      -> False
+         Just balance ->
+            balance >= (_amount tHeader)
+
 
 
 validateChain :: BlockChain -> Bool

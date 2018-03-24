@@ -7,6 +7,7 @@
 
 module Types
     ( Transaction(..)
+    , TransactionRequest(..)
     , Block(..)
     , BlockData(..)
     , BlockChain(..)
@@ -17,10 +18,10 @@ module Types
     , Account(..)
     , Env(..)
     , Key (..)
+    , Sig (..)
     , Public
     , Private
-    , ValidPublic
-    , ValidPrivate
+    , TransactionHeader(..)
     , showPrivateKey
     , showPublicKey
     , module Data.Semigroup
@@ -42,47 +43,61 @@ import           GHC.Generics           (Generic)
 
 data Public
 data Private
-data ValidPublic
-data ValidPrivate
 
 newtype Key k = K B.ByteString
+type Sig = (Integer, Integer)
 
-deriving instance Show (Key ValidPrivate)
+
+deriving instance Eq (Key Public)
+deriving instance Show (Key Public)
+deriving instance Ord (Key Public)
+deriving instance Generic (Key Public)
 
 
-deriving instance Eq (Key ValidPublic)
-deriving instance Show (Key ValidPublic)
-deriving instance Ord (Key ValidPublic)
-deriving instance Generic (Key ValidPublic)
-
-instance Binary (Key ValidPublic)
-
-showPublicKey :: Key ValidPublic -> T.Text
+showPublicKey :: Key Public -> T.Text
 showPublicKey (K pubKey) = T.decodeLatin1 pubKey
 
-showPrivateKey :: Key ValidPrivate -> T.Text
+showPrivateKey :: Key Private -> T.Text
 showPrivateKey (K privKey) = T.decodeLatin1 privKey
 
-instance ToJSON (Key ValidPublic) where
-    toJSON = toJSON . showPublicKey
 
 
-instance FromJSON (Key ValidPublic) where
+
+instance ToJSON (Key Public) where
+    toJSON (K p)= toJSON (T.decodeLatin1 p)
+
+
+instance FromJSON (Key Public) where
     parseJSON = withText "PublicKey" $ pure . K . T.encodeUtf8
 
+instance Binary (Key Public)
 
-data Account = Account !(Key ValidPublic) | Faucet
-    deriving (Eq, Show, Generic, Ord)
 
-$(deriveJSON defaultOptions ''Account)
+type Account = Key Public
 
-instance Binary Account
+data TransactionRequest =
+    TransactionRequest{ to     :: !Account
+                      , amount :: !Int
+                      } deriving (Eq, Show, Generic)
 
+
+$(deriveJSON defaultOptions ''TransactionRequest)
+
+
+data TransactionHeader =
+    TransactionHeader{ _from   :: !Account
+                     , _to     :: !Account
+                     , _amount :: !Int
+                     } deriving (Eq, Show, Generic)
+
+$(deriveJSON defaultOptions ''TransactionHeader)
+
+
+instance Binary TransactionHeader
 
 data Transaction =
-     Transaction { from   :: !Account
-                 , to     :: !Account
-                 , amount :: !Int
+     Transaction { _tHeader   :: !TransactionHeader
+                 , _signature :: !Sig
                  } deriving (Eq, Show, Generic)
 
 $(deriveJSON defaultOptions ''Transaction)
@@ -90,8 +105,10 @@ $(deriveJSON defaultOptions ''Transaction)
 instance Binary Transaction
 
 
+
 data Block = Block
             { _minerAccount :: !Account
+            , _minerReward  :: !Int
             , _transactions :: ![Transaction]
             , _nonce        :: !Int
             }
@@ -140,6 +157,6 @@ data State = State
 data Env = Env
          { _state   :: !State
          , _log     :: !(T.Text -> IO ())
-         , _isMiner :: Bool
-         , _keys    :: !(Key ValidPublic, Key ValidPrivate)
+         , _isMiner :: !Bool
+         , _keys    :: !(Key Public, Key Private)
          }

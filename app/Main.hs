@@ -24,6 +24,7 @@ data Args = RunNode Bool FilePath
           | GenAccount FilePath
   deriving Show
 
+defaultPath = "keysDir/k1.txt"
 
 args :: Parser Args
 args = runNode <|> genAccount
@@ -34,18 +35,18 @@ args = runNode <|> genAccount
                  <> help "Is node a miner"
                  <> value False
                  <> showDefault)
-            <*> option auto
+            <*> strOption
                  ( long "dirPath"
                   <> help "Path to keys directory"
-                  <> value "keysDir/k1.txt"
+                  <> value defaultPath
                   <> showDefault)
 
         genAccount = GenAccount
-                <$> option auto
+                <$> strOption
                      ( long "genAccount"
                      <> help ("Generate Account, "
                             <>"provide path to store keys files ")
-                     <> value "keysDir/k1.txt"
+                     <> value defaultPath
                      <> showDefault)
 
 opts :: ParserInfo Args
@@ -79,7 +80,7 @@ runProgram = do
 
                     initState <- initialState
                     concLogger <- Log.newTBQLogger
-                    Server.startApp 
+                    Server.startApp
                         Env { _state = initState
                             , _log =  Log.mkLogger concLogger
                             , _isMiner =  isMiner

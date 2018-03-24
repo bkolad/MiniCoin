@@ -28,13 +28,13 @@ import           Types
 
 
 type API = "transactions":> "new"
-                :> ReqBody '[JSON] Transaction
+                :> ReqBody '[JSON] TransactionRequest
                 :> Post '[JSON] NoContent
         :<|> "transactions":> "pending"
                 :> Get '[JSON] [Transaction]
         :<|> "blockchain"
                 :> Get '[JSON] BlockChain
-        :<|> "blockchain":>"mine"
+        :<|> "blockchain":> "mine"
                 :> Get '[JSON] NoContent
 
 
@@ -78,7 +78,7 @@ startMining = do
     Log.logM  "start mining "
     (bChain, pTrans) <-liftIO $ readState bc pending
     (pubKey, _)<-_keys <$> ask
-    let !newBCN =  BCN.mine (Account pubKey) bChain pTrans
+    let !newBCN =  BCN.mine pubKey bChain pTrans
     Log.logM  "block mined "
     _ <-liftIO $ atomically $ do
         writeTVar bc newBCN
@@ -92,19 +92,19 @@ startMining = do
                    return (b, p)
 
 
---http://localhost:8080/blockchain
 chain :: ReaderT Env Handler BlockChain
 chain = do
         blockchain <- _blockChain <$> askForState
         liftIO $ BCN.getBlockChain blockchain
 
-
---curl -X POST -d '{"from":{"tag":"Account","contents":"John"},"to":{"tag":"Account","contents":"Me"},"amount":99}' -H 'Accept: application/json' -H 'Content-type: application/json' http://localhost:8080/transactions/new/
-newTransaction :: Transaction -> ReaderT Env Handler NoContent
-newTransaction transaction = do
+newTransaction :: TransactionRequest -> ReaderT Env Handler NoContent
+newTransaction transactionRequest  = do
+      keys <- _keys <$> ask
+      transaction <- liftIO $ TCN.tReqToTransaction transactionRequest keys
       pendTransactions <- _pendingTransactions <$> askForState
       liftIO $ TCN.addTransaction pendTransactions transaction
       return NoContent
+
 
 --http://localhost:8080/transactions/pending
 pendingTransactions :: ReaderT Env Handler [Transaction]

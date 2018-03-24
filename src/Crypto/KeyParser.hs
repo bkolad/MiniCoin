@@ -37,7 +37,7 @@ isEOL c = c == '\n' || c == '\r'
 
 
 parseFromFile :: FilePath
-              -> IO (Either T.Text (Key ValidPublic, Key ValidPrivate))
+              -> IO (Either T.Text (Key Public, Key Private))
 parseFromFile dir = do
     content <- B.readFile dir
     case B8.parse parseKeys content of
