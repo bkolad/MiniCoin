@@ -1,3 +1,4 @@
+{-# LANGUAGE StandaloneDeriving #-}
 
 module Crypto.Extended
     ( generateKeys
@@ -7,7 +8,15 @@ module Crypto.Extended
     , mkPrivateKey
     , validateKeys
     , verify
-    , signTransactionHeader
+    , hashWith
+    , signatureToSig
+    , sign
+    , Account
+    , Sig
+    , Public
+    , Private
+    , Key
+    , SHA256(..)
     ) where
 
 
@@ -23,11 +32,47 @@ import qualified Data.Text                        as T
 import qualified Data.Text.Encoding               as T
 import qualified Data.Text.IO                     as T
 import           Data.Word8
+import           Crypto.Hash --(hashWith, SHA256)
 import           GHC.Generics                     (Generic)
-import           Types
+import           Data.Aeson             (FromJSON (..), ToJSON (..), withText)
+import           Data.Aeson.TH
+import           Data.Semigroup         ((<>))
 
 
 
+data Public
+data Private
+
+newtype Key k = K B.ByteString
+type Sig = (Integer, Integer)
+
+
+deriving instance Eq (Key Public)
+deriving instance Show (Key Public)
+deriving instance Ord (Key Public)
+deriving instance Generic (Key Public)
+
+
+showPublicKey :: Key Public -> T.Text
+showPublicKey (K pubKey) = T.decodeLatin1 pubKey
+
+showPrivateKey :: Key Private -> T.Text
+showPrivateKey (K privKey) = T.decodeLatin1 privKey
+
+
+
+instance ToJSON (Key Public) where
+    toJSON (K p)= toJSON (T.decodeLatin1 p)
+
+
+instance FromJSON (Key Public) where
+    parseJSON = withText "PublicKey" $ pure . K . T.encodeUtf8
+
+
+instance B.Binary (Key Public)
+
+
+type Account = Key Public
 
 
 instance B.Binary ECC.Point where
@@ -98,10 +143,11 @@ b16ToPrivateKey (K bs) = b16ToKey "Private" bs
 
 -------------------------------------------------
 
-verify :: Key Public -> ECC.Signature -> B.ByteString -> Bool
-verify pk sig msg=
+verify :: Key Public -> Sig -> B.ByteString -> Bool
+verify pk (x ,y) msg=
     let k = validKeyToByteString pk
-    in  ECC.verify SHA256 k sig msg
+        signature = ECC.Signature x y
+    in  ECC.verify SHA256 k signature msg
 
 
 sign :: Key Private -> B.ByteString -> IO ECC.Signature
@@ -110,9 +156,6 @@ sign pk =
     in ECC.sign k SHA256
 
 
-signTransactionHeader:: Key Private -> TransactionHeader -> IO Sig
-signTransactionHeader pk tr = signatureToSig <$> sign pk encodedTR
-    where encodedTR = BL.toStrict $ B.encode tr
 
 
 signatureToSig ::  ECC.Signature -> Sig

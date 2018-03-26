@@ -78,6 +78,7 @@ startMining = do
     Log.logM  "start mining "
     (bChain, pTrans) <-liftIO $ readState bc pending
     (pubKey, _)<-_keys <$> ask
+    -- Making sure mining is done in the current thread
     let !newBCN =  BCN.mine pubKey bChain pTrans
     Log.logM  "block mined "
     _ <-liftIO $ atomically $ do

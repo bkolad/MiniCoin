@@ -9,7 +9,7 @@ module BlockChain
     ) where
 
 import           Control.Concurrent.Extended
-import qualified Crypto.Hash                 as H
+import qualified Crypto.Extended             as Crypto
 import qualified Data.Binary                 as B
 import qualified Data.ByteArray.Encoding     as E
 import qualified Data.ByteString             as B
@@ -20,20 +20,23 @@ import qualified Data.Map.Strict             as M
 import qualified Data.Text                   as T
 import qualified Transaction                 as TCN
 import           Types
+import           Data.List (foldl')
+
 
 
 initBlockChain :: IO (TVar BlockChain)
 initBlockChain =
     newTVarIO (genesis, [])
 
-hardcodedMinerForGensis = K "00010100000000000000487c1741d7169bd8ac5ca752a28f736b231f901857b56c4d1a38bbf6302a1224a039fb13bc50f9f0b61ac03d825067904d7ffdb0e40f8d4f5bc68df3c64b6a3b4c2407035a53c3cc0601010000000000000048d16539e35721426503171e245cf049390d1c675097340d7ae35431209a32c36b7370a25c5b772947b0232b893302e62ce3d8911add4b0dad283a4478408418ebf231dc7896c4ac06"
+hardcodedMinerForGensis = Crypto.mkPublicKey "00010100000000000000487c1741d7169bd8ac5ca752a28f736b231f901857b56c4d1a38bbf6302a1224a039fb13bc50f9f0b61ac03d825067904d7ffdb0e40f8d4f5bc68df3c64b6a3b4c2407035a53c3cc0601010000000000000048d16539e35721426503171e245cf049390d1c675097340d7ae35431209a32c36b7370a25c5b772947b0232b893302e62ce3d8911add4b0dad283a4478408418ebf231dc7896c4ac06"
 
-
+genesis :: Genesis
 genesis = Block { _minerAccount = hardcodedMinerForGensis
-                , _minerReward = 50
+                , _minerReward = 0
                 , _transactions  = []
                 , _nonce         = 99
                 }
+
 
 mineBlock :: Account -> BlockChain -> [Transaction] -> Int -> BlockData
 mineBlock minerAcc blockChain transactions nonce =
@@ -49,47 +52,67 @@ mineBlock minerAcc blockChain transactions nonce =
 
 validTransactions :: BlockChain -> [Transaction] -> [Transaction]
 validTransactions  blockChain ts =
-    filter isValid ts
-     where
-        isValid = isTransactionValid (balanceMap blockChain)
+    snd $ foldTransactions (balanceMap blockChain) ts
 
-dist :: (a -> b, a -> c) -> a -> (b, c)
-dist (f, g) = \a -> (f a, g a)
--- this implementation allows double spending
+
+arrow :: (a -> b, a -> c) -> a -> (b, c)
+arrow (f, g) = \a -> (f a, g a)
+
+
 balanceMap :: BlockChain -> M.Map Account Int
-balanceMap (Block{}, bc) =
-    let allMinerRewards =  dist ( _minerAccount, _minerReward) <$> _block <$> bc
-        allTransactions =  _transactions . _block =<< bc
-        transactionBalanceMap = foldl mkMapT M.empty allTransactions
+balanceMap (genesis, bc) =
+    let allBlocks = genesis : (_block <$> bc)
 
-    in foldl mkMapR transactionBalanceMap allMinerRewards
+        allMinerRewards =  arrow ( _minerAccount, _minerReward) <$> allBlocks
+        rewardBalanceMap = foldl' addMinerReward M.empty allMinerRewards
+
+        allTransactions =  allBlocks >>= _transactions
+        transactionBalanceMap = foldl' addTransaction rewardBalanceMap allTransactions
+
+    in transactionBalanceMap
         where
-            mkMapT !acc (Transaction tHeader _) =
-                let from    = _from tHeader
-                    to      = _to tHeader
-                    amount  = _amount tHeader
-
-                    m = M.insertWith (+) from (- amount) acc
-                in M.insertWith (+) to amount m
-
-            mkMapR !acc (miner, amount) =
+            addMinerReward !acc (miner, amount) =
                   M.insertWith (+) miner amount acc
+
+
+addTransaction ::  M.Map Account Int -> Transaction -> M.Map Account Int
+addTransaction !balanceMap tr  =
+    let _from    = TCN.from tr
+        _to      = TCN.to tr
+        _amount  = TCN.amount tr
+
+        m = M.insertWith (+) _from (- _amount) balanceMap
+    in  M.insertWith (+) _to _amount m
+
+
+foldTransactions :: M.Map Account Int
+                 -> [Transaction]
+                 -> (M.Map Account Int ,[Transaction])
+foldTransactions balanceMap pendingTransactions =
+     foldl' updateBalanceMap (balanceMap, []) pendingTransactions
+     where
+         updateBalanceMap !(balanceMap, ts) tr =
+             if isTransactionValid balanceMap tr then
+                 (addTransaction balanceMap tr, tr : ts )
+                 else (balanceMap, ts)
 
 
 
 isTransactionValid :: M.Map Account Int -> Transaction -> Bool
-isTransactionValid balanceMap (Transaction tHeader sig)  =
-    case M.lookup (_from tHeader) balanceMap of
+isTransactionValid balanceMap transaction  =
+    case M.lookup (TCN.from transaction) balanceMap of
          Nothing      -> False
          Just balance ->
-            balance >= (_amount tHeader)
+            balance >= TCN.amount transaction
+                    && TCN.isTransactionSignedBySender transaction
 
 
 
 validateChain :: BlockChain -> Bool
 validateChain (_, []) = True
 validateChain (g, x:xs) =
-     (_parentHash x == hashOfTheTail) && (validateChain blockChainTail)
+     _parentHash x == hashOfTheTail
+                  && validateChain blockChainTail
     where
         blockChainTail = (g, xs)
         hashOfTheTail = hash256BC blockChainTail
@@ -123,7 +146,7 @@ hash256BC !bc = case bc of
 hash256 b  =
     let !serialized = BL.toStrict $ B.encode b
         convertTo !hash = E.convertToBase E.Base16 hash
-    in HASH $ convertTo $ H.hashWith SHA256 serialized
+    in HASH $ convertTo $ Crypto.hashWith Crypto.SHA256 serialized
 
 
 append :: BlockChain -> BlockData -> BlockChain

@@ -12,7 +12,7 @@ import           Types
 
 parsePublicKey :: B8.Parser (Key Public)
 parsePublicKey =
-    K <$> (pubKeyStr *> pubKey)
+    Crypto.mkPublicKey <$> (pubKeyStr *> pubKey)
     where
         pubKeyStr = B8.string "PUBLIC Key: "
         pubKey = B8.takeTill isEOL
@@ -20,7 +20,7 @@ parsePublicKey =
 
 parsePrivateKey :: B8.Parser (Key Private)
 parsePrivateKey =
-    K <$> (privKeyStr *> privKey)
+    Crypto.mkPrivateKey <$> (privKeyStr *> privKey)
     where
         privKeyStr = B8.string "PRIVATE Key: "
         privKey = B8.takeTill isEOL
