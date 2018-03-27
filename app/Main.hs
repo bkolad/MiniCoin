@@ -7,18 +7,17 @@ import           Control.Applicative
 import           Control.Concurrent.Extended
 import           Control.Logging.Extended    as Log
 import qualified Data.Text                   as T
+import qualified Data.Text.Encoding          as T
+import qualified Data.Text.IO                as T
 import           Options.Applicative
 import qualified Server
+import           State
 import           System.Environment
-import           Types
-import qualified Data.Text.IO as T
-import qualified Data.Text.Encoding     as T
 
-import qualified Crypto.Extended as Crypto
-import qualified Data.ByteString        as B
-import qualified Crypto.KeyParser as KP
-import qualified Crypto.Extended as Crypto
-
+import qualified Crypto.Extended             as Crypto
+import qualified Crypto.KeyParser            as KP
+import qualified Data.ByteString             as B
+import           Data.Semigroup              ((<>))
 
 data Args = RunNode Bool FilePath
           | GenAccount FilePath
@@ -100,10 +99,10 @@ runProgram = do
 
                 fileContent pub priv =  T.encodeUtf8 $
                                 "PUBLIC Key: "
-                                <> showPublicKey pub
+                                <> Crypto.showPublicKey pub
                                 <> "\n"
                                 <> "PRIVATE Key: "
-                                <> showPrivateKey priv
+                                <> Crypto.showPrivateKey priv
 
 
 saveKeysToFile ::  FilePath -> B.ByteString -> IO ()

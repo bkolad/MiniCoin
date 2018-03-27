@@ -38,7 +38,8 @@ library
                      , word8
                      , attoparsec
   default-language:    Haskell2010
-  extensions:        OverloadedStrings
+  extensions:        OverloadedStrings, FlexibleInstances, DeriveGeneric,
+                     StandaloneDeriving, TemplateHaskell, TypeOperators, DataKinds, BangPatterns
 
 executable BlockChain-exe
   hs-source-dirs:      app
