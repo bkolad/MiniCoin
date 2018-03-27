@@ -1,9 +1,3 @@
-{-# LANGUAGE BangPatterns      #-}
-{-# LANGUAGE DataKinds         #-}
-{-# LANGUAGE FlexibleContexts  #-}
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE TemplateHaskell   #-}
-{-# LANGUAGE TypeOperators     #-}
 
 module Server
     ( startApp
@@ -24,16 +18,16 @@ import           Network.Wai.Handler.Warp    as Warp
 import           Servant
 import           Servant.Server
 import qualified Transaction                 as TCN
-import           Types
+import State
 
 
 type API = "transactions":> "new"
-                :> ReqBody '[JSON] TransactionRequest
+                :> ReqBody '[JSON] TCN.TransactionRequest
                 :> Post '[JSON] NoContent
         :<|> "transactions":> "pending"
-                :> Get '[JSON] [Transaction]
+                :> Get '[JSON] [TCN.Transaction]
         :<|> "blockchain"
-                :> Get '[JSON] BlockChain
+                :> Get '[JSON] BCN.BlockChain
         :<|> "blockchain":> "mine"
                 :> Get '[JSON] NoContent
 
@@ -93,12 +87,12 @@ startMining = do
                    return (b, p)
 
 
-chain :: ReaderT Env Handler BlockChain
+chain :: ReaderT Env Handler BCN.BlockChain
 chain = do
         blockchain <- _blockChain <$> askForState
         liftIO $ BCN.getBlockChain blockchain
 
-newTransaction :: TransactionRequest -> ReaderT Env Handler NoContent
+newTransaction :: TCN.TransactionRequest -> ReaderT Env Handler NoContent
 newTransaction transactionRequest  = do
       keys <- _keys <$> ask
       transaction <- liftIO $ TCN.tReqToTransaction transactionRequest keys
@@ -108,7 +102,7 @@ newTransaction transactionRequest  = do
 
 
 --http://localhost:8080/transactions/pending
-pendingTransactions :: ReaderT Env Handler [Transaction]
+pendingTransactions :: ReaderT Env Handler [TCN.Transaction]
 pendingTransactions = do
     State _ pendTransactions <- askForState
     liftIO $ TCN.getTransactions pendTransactions

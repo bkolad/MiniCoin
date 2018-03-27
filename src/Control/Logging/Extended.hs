@@ -14,11 +14,11 @@ module Control.Logging.Extended
 import           Control.Concurrent.Extended
 import qualified Control.Logging             as Log
 import           Control.Monad               (forever)
-import           Control.Monad.IO.Class
-import           Control.Monad.Trans.Reader
+import           Control.Monad.IO.Class (MonadIO, liftIO)
+import           Control.Monad.Trans.Reader (ReaderT, ask)
 import qualified Data.Text                   as T
 import           Prelude                     hiding (log)
-import           Types
+import State
 
 
 data Logger = Simple
@@ -48,5 +48,5 @@ newTBQLogger = do
     tbq <- newTBQueueIO 1000
     forkIO $ forever $ do
         txt <- atomically $ readTBQueue tbq
-        Log.log $ txt
+        Log.log txt
     return $ Concurrent tbq

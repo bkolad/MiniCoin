@@ -3,16 +3,16 @@ module Crypto.KeyParser
     ( parseFromFile
     ) where
 
-import qualified Crypto.Extended                  as Crypto
+import            Crypto.Extended
 import qualified Data.Attoparsec.ByteString.Char8 as B8
 import qualified Data.ByteString                  as B
 import qualified Data.Text                        as T
-import           Types
+import           Data.Semigroup         ((<>))
 
 
 parsePublicKey :: B8.Parser (Key Public)
 parsePublicKey =
-    Crypto.mkPublicKey <$> (pubKeyStr *> pubKey)
+    mkPublicKey <$> (pubKeyStr *> pubKey)
     where
         pubKeyStr = B8.string "PUBLIC Key: "
         pubKey = B8.takeTill isEOL
@@ -20,7 +20,7 @@ parsePublicKey =
 
 parsePrivateKey :: B8.Parser (Key Private)
 parsePrivateKey =
-    Crypto.mkPrivateKey <$> (privKeyStr *> privKey)
+    mkPrivateKey <$> (privKeyStr *> privKey)
     where
         privKeyStr = B8.string "PRIVATE Key: "
         privKey = B8.takeTill isEOL
@@ -41,5 +41,5 @@ parseFromFile :: FilePath
 parseFromFile dir = do
     content <- B.readFile dir
     case B8.parse parseKeys content of
-            B8.Done i keys -> return $ Crypto.validateKeys keys
+            B8.Done i keys -> return $ validateKeys keys
             other -> return $ Left $ "Corrupted file: " <> T.pack(show dir)

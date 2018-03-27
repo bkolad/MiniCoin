@@ -1,11 +1,8 @@
-{-# LANGUAGE BangPatterns      #-}
-{-# LANGUAGE OverloadedStrings #-}
---{-# LANGUAGE  RecordWildCards  #-}
-
 module BlockChain
     ( mine
     , getBlockChain
     , initBlockChain
+    , BlockChain
     ) where
 
 import           Control.Concurrent.Extended
@@ -17,28 +14,87 @@ import qualified Data.ByteString.Char8       as C8
 import qualified Data.ByteString.Lazy        as BL
 import qualified Data.List.NonEmpty          as NEL
 import qualified Data.Map.Strict             as M
-import qualified Data.Text                   as T
 import qualified Transaction                 as TCN
-import           Types
 import           Data.List (foldl')
+import           GHC.Generics           (Generic)
+import           Data.Aeson             (FromJSON (..), ToJSON (..), withText)
+import           Data.Aeson.TH
+import           Data.Binary
+import qualified Data.Text              as T
+import qualified Data.Text.Encoding     as T
 
 
+data Block = Block
+            { _minerAccount :: !Crypto.Account
+            , _minerReward  :: !Int
+            , _transactions :: ![TCN.Transaction]
+            , _nonce        :: !Int
+            }
+            deriving (Eq, Show, Generic)
+
+$(deriveJSON defaultOptions ''Block)
+instance Binary Block
+
+
+newtype HASH = HASH B.ByteString
+    deriving (Eq, Show, Generic)
+
+
+instance ToJSON HASH where
+    toJSON (HASH h)= toJSON (T.decodeLatin1 h)
+
+
+instance FromJSON HASH where
+    parseJSON = withText "HASH" $ pure . HASH . T.encodeUtf8
+
+
+instance Binary HASH
+
+
+data BlockData = BlockData
+               { _block      :: !Block
+               , _parentHash :: !HASH
+               } deriving (Eq, Show, Generic)
+
+
+$(deriveJSON defaultOptions ''BlockData)
+instance Binary BlockData
+
+type Genesis = Block
+
+
+type BlockChain = (Genesis, [BlockData])
+
+hardcodedMinerForGensis = Crypto.mkPublicKey "00010100000000000000487c1741d7169bd8ac5ca752a28f736b231f901857b56c4d1a38bbf6302a1224a039fb13bc50f9f0b61ac03d825067904d7ffdb0e40f8d4f5bc68df3c64b6a3b4c2407035a53c3cc0601010000000000000048d16539e35721426503171e245cf049390d1c675097340d7ae35431209a32c36b7370a25c5b772947b0232b893302e62ce3d8911add4b0dad283a4478408418ebf231dc7896c4ac06"
+
+-- | === Public ==
 
 initBlockChain :: IO (TVar BlockChain)
 initBlockChain =
     newTVarIO (genesis, [])
-
-hardcodedMinerForGensis = Crypto.mkPublicKey "00010100000000000000487c1741d7169bd8ac5ca752a28f736b231f901857b56c4d1a38bbf6302a1224a039fb13bc50f9f0b61ac03d825067904d7ffdb0e40f8d4f5bc68df3c64b6a3b4c2407035a53c3cc0601010000000000000048d16539e35721426503171e245cf049390d1c675097340d7ae35431209a32c36b7370a25c5b772947b0232b893302e62ce3d8911add4b0dad283a4478408418ebf231dc7896c4ac06"
-
-genesis :: Genesis
-genesis = Block { _minerAccount = hardcodedMinerForGensis
-                , _minerReward = 0
-                , _transactions  = []
-                , _nonce         = 99
-                }
+    where
+        genesis = Block { _minerAccount = hardcodedMinerForGensis
+                        , _minerReward = 0
+                        , _transactions  = []
+                        , _nonce         = 99
+                        }
 
 
-mineBlock :: Account -> BlockChain -> [Transaction] -> Int -> BlockData
+mine :: Crypto.Account -> BlockChain -> [TCN.Transaction] -> BlockChain
+mine miner blockChain tcns =
+       let blockData = head -- it safe here, we are filtering stream
+                $ filter verifyProofOfWork
+                $ (\nonce -> mineBlock miner blockChain tcns nonce) <$> [1 ..]
+       in append blockChain blockData
+
+
+getBlockChain :: TVar BlockChain -> IO BlockChain
+getBlockChain blockChain = readTVarIO blockChain
+
+-- | === Private ==
+
+
+mineBlock :: Crypto.Account -> BlockChain -> [TCN.Transaction] -> Int -> BlockData
 mineBlock minerAcc blockChain transactions nonce =
     let block = Block
               { _minerAccount = minerAcc
@@ -50,7 +106,7 @@ mineBlock minerAcc blockChain transactions nonce =
 
 
 
-validTransactions :: BlockChain -> [Transaction] -> [Transaction]
+validTransactions :: BlockChain -> [TCN.Transaction] -> [TCN.Transaction]
 validTransactions  blockChain ts =
     snd $ foldTransactions (balanceMap blockChain) ts
 
@@ -59,7 +115,7 @@ arrow :: (a -> b, a -> c) -> a -> (b, c)
 arrow (f, g) = \a -> (f a, g a)
 
 
-balanceMap :: BlockChain -> M.Map Account Int
+balanceMap :: BlockChain -> M.Map Crypto.Account Int
 balanceMap (genesis, bc) =
     let allBlocks = genesis : (_block <$> bc)
 
@@ -75,7 +131,7 @@ balanceMap (genesis, bc) =
                   M.insertWith (+) miner amount acc
 
 
-addTransaction ::  M.Map Account Int -> Transaction -> M.Map Account Int
+addTransaction ::  M.Map Crypto.Account Int -> TCN.Transaction -> M.Map Crypto.Account Int
 addTransaction !balanceMap tr  =
     let _from    = TCN.from tr
         _to      = TCN.to tr
@@ -85,9 +141,9 @@ addTransaction !balanceMap tr  =
     in  M.insertWith (+) _to _amount m
 
 
-foldTransactions :: M.Map Account Int
-                 -> [Transaction]
-                 -> (M.Map Account Int ,[Transaction])
+foldTransactions :: M.Map Crypto.Account Int
+                 -> [TCN.Transaction]
+                 -> (M.Map Crypto.Account Int ,[TCN.Transaction])
 foldTransactions balanceMap pendingTransactions =
      foldl' updateBalanceMap (balanceMap, []) pendingTransactions
      where
@@ -98,7 +154,7 @@ foldTransactions balanceMap pendingTransactions =
 
 
 
-isTransactionValid :: M.Map Account Int -> Transaction -> Bool
+isTransactionValid :: M.Map Crypto.Account Int -> TCN.Transaction -> Bool
 isTransactionValid balanceMap transaction  =
     case M.lookup (TCN.from transaction) balanceMap of
          Nothing      -> False
@@ -123,18 +179,6 @@ verifyProofOfWork bd = B.isPrefixOf difficulty hash
     where
         HASH hash = hash256 bd
         difficulty = "000"
-
-
-mine :: Account -> BlockChain -> [Transaction] -> BlockChain
-mine miner blockChain tcns =
-       let blockData = head -- it safe here, we are filtering stream
-                $ filter verifyProofOfWork
-                $ (\nonce -> mineBlock miner blockChain tcns nonce) <$> [1 ..]
-       in append blockChain blockData
-
-
-getBlockChain :: TVar BlockChain -> IO BlockChain
-getBlockChain blockChain = readTVarIO blockChain
 
 
 hash256BC :: BlockChain -> HASH
