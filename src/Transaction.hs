@@ -17,15 +17,14 @@ import qualified Crypto.Extended             as Crypto
 import           Data.Aeson                  (FromJSON (..), ToJSON (..),
                                               withText)
 import           Data.Aeson.TH
-import qualified Data.Binary                 as B
 import qualified Data.ByteString             as B
 import qualified Data.ByteString.Lazy        as BL
 import           GHC.Generics                (Generic)
-
+import qualified Data.Serialize as S
 
 data TransactionRequest =
     TransactionRequest !Crypto.Account !Int
-                       deriving (Eq, Show, Generic)
+                       deriving (Eq, Show, Generic, S.Serialize)
 
 
 $(deriveJSON defaultOptions ''TransactionRequest)
@@ -35,21 +34,18 @@ data TransactionHeader =
     TransactionHeader{ _from   :: !Crypto.Account
                      , _to     :: !Crypto.Account
                      , _amount :: !Int
-                     } deriving (Eq, Show, Generic)
+                     } deriving (Eq, Show, Generic, S.Serialize)
 
 $(deriveJSON defaultOptions ''TransactionHeader)
 
 
-instance B.Binary TransactionHeader
-
 data Transaction =
      Transaction { _tHeader   :: !TransactionHeader
                  , _signature :: !Crypto.Sig
-                 } deriving (Eq, Show, Generic)
+                 } deriving (Eq, Show, Generic, S.Serialize)
 
 $(deriveJSON defaultOptions ''Transaction)
 
-instance B.Binary Transaction
 
 
 tReqToTransaction :: TransactionRequest
@@ -93,7 +89,7 @@ signTransactionHeader pk tr = Crypto.signatureToSig <$> Crypto.sign pk encodedTR
 
 
 encodeTransactionHeader :: TransactionHeader -> B.ByteString
-encodeTransactionHeader tr = BL.toStrict $ B.encode  tr
+encodeTransactionHeader tr = S.encode  tr
 
 
 isTransactionSignedBySender :: Transaction -> Bool

@@ -7,7 +7,6 @@ module BlockChain
 
 import           Control.Concurrent.Extended
 import qualified Crypto.Extended             as Crypto
-import qualified Data.Binary                 as B
 import qualified Data.ByteArray.Encoding     as E
 import qualified Data.ByteString             as B
 import qualified Data.ByteString.Char8       as C8
@@ -22,7 +21,7 @@ import           Data.Aeson.TH
 import           Data.Binary
 import qualified Data.Text              as T
 import qualified Data.Text.Encoding     as T
-
+import qualified Data.Serialize as S
 
 data Block = Block
             { _minerAccount :: !Crypto.Account
@@ -30,14 +29,13 @@ data Block = Block
             , _transactions :: ![TCN.Transaction]
             , _nonce        :: !Int
             }
-            deriving (Eq, Show, Generic)
+            deriving (Eq, Show, Generic, S.Serialize)
 
 $(deriveJSON defaultOptions ''Block)
-instance Binary Block
 
 
 newtype HASH = HASH B.ByteString
-    deriving (Eq, Show, Generic)
+    deriving (Eq, Show, Generic, S.Serialize)
 
 
 instance ToJSON HASH where
@@ -54,11 +52,10 @@ instance Binary HASH
 data BlockData = BlockData
                { _block      :: !Block
                , _parentHash :: !HASH
-               } deriving (Eq, Show, Generic)
+               } deriving (Eq, Show, Generic, S.Serialize)
 
 
 $(deriveJSON defaultOptions ''BlockData)
-instance Binary BlockData
 
 type Genesis = Block
 
@@ -188,7 +185,7 @@ hash256BC !bc = case bc of
 
 
 hash256 b  =
-    let !serialized = BL.toStrict $ B.encode b
+    let !serialized = S.encode b
         convertTo !hash = E.convertToBase E.Base16 hash
     in HASH $ convertTo $ Crypto.hashWith Crypto.SHA256 serialized
 
