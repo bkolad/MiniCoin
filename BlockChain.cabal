@@ -37,9 +37,12 @@ library
                      , base16-bytestring
                      , word8
                      , attoparsec
+                     , cereal
+                     , either
+                     , merkle-tree
   default-language:    Haskell2010
   extensions:        OverloadedStrings, FlexibleInstances, DeriveGeneric,
-                     StandaloneDeriving, TemplateHaskell, TypeOperators, DataKinds, BangPatterns
+                     StandaloneDeriving, TemplateHaskell, TypeOperators, DataKinds, BangPatterns, DeriveAnyClass
 
 executable BlockChain-exe
   hs-source-dirs:      app

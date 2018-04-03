@@ -92,6 +92,7 @@ chain = do
         blockchain <- _blockChain <$> askForState
         liftIO $ BCN.getBlockChain blockchain
 
+
 newTransaction :: TCN.TransactionRequest -> ReaderT Env Handler NoContent
 newTransaction transactionRequest  = do
       keys <- _keys <$> ask

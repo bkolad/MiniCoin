@@ -10,4 +10,5 @@ extra-deps:
 - servant-0.12.1
 - logging-3.0.5
 - attoparsec-0.13.2.2
+- merkle-tree-0.1.0
 resolver: nightly-2018-03-07
